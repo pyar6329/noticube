@@ -10,7 +10,7 @@ help: ## show help message.
 
 .PHONY:	doc
 doc: ## generate document for Dash: https://kapeli.com/dash
-	@./script/cargo_doc.sh
+	@./scripts/cargo_doc.sh
 
 .PHONY:	check
 check: ## check compile is succeed
@@ -28,6 +28,10 @@ update_cargo: ## build application
 run: ## run: cargo run
 	@make build
 	@cargo run --quiet -j $(CPU_CORES)
+
+.PHONY:	send_mail
+send_mail: ## check sending email
+	@./scripts/check_sending_mail.sh
 
 .PHONY:	test
 test: ## run: unit/integration test
@@ -47,12 +51,12 @@ test_unit_debug: ## run: only unit test (print debug mode)
 
 .PHONY: format
 format: ## run: cargo clippy && cargo fmt
-	@./script/cargo_format.sh
+	@./scripts/cargo_format.sh
 
 .PHONY:	clean
 clean: ## run: cargo clean
-	@./script/cargo_clean.sh
+	@./scripts/cargo_clean.sh
 
 .PHONY: docker-push
 docker-push: ## docker push to ECR on local
-	@./script/build_docker_local.sh
+	@./scripts/build_docker_local.sh
