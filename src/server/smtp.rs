@@ -1,10 +1,13 @@
 use super::ServerError;
 use crate::client::SlackClient;
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Error, Result};
 use mailin_embedded::{response, Handler, Response, Server};
 use std::sync::{Arc, Mutex};
 use std::{io, net::IpAddr};
-use tokio::sync::mpsc;
+use tokio::{
+    sync::{mpsc, oneshot},
+    time::Duration,
+};
 use tracing::{debug, error, info};
 
 #[derive(Debug, Clone)]
@@ -37,11 +40,13 @@ impl Handler for SMTPServer {
             let tx2 = self.tx.to_owned();
             let buffer2 = buffer.to_owned();
 
-            tokio::runtime::Builder::new_multi_thread()
+            let rt = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
-                .unwrap()
-                .spawn(async move { tx2.send(buffer2).await });
+                .unwrap();
+
+            rt.spawn(async move { tx2.send(buffer2).await });
+            rt.shutdown_timeout(Duration::from_secs(30));
         }
         response::OK
     }
@@ -50,6 +55,7 @@ impl Handler for SMTPServer {
 impl SMTPServer {
     pub async fn run(address: &str, slack_client: &SlackClient) -> Result<(), Error> {
         info!("succeed loading configuration");
+        let (ps_tx, ps_rx) = oneshot::channel();
         let (tx, mut rx) = mpsc::channel(32);
         let handler = SMTPServer {
             email_content_buffer: Arc::new(Mutex::new("".to_string())),
@@ -68,10 +74,14 @@ impl SMTPServer {
         info!("succeed SMTP server configuration");
         info!("running SMTP server");
         tokio::spawn(async move {
-            let _ = server.serve().map_err(|e| {
+            let server_status = server.serve();
+
+            if let Err(e) = server_status {
                 error!("error running SMTP server: {}", e);
-                ServerError::CannotStartServer
-            });
+                let _ = ps_tx.send(Err(ServerError::CannotStartServer));
+            } else {
+                let _ = ps_tx.send(Ok(()));
+            }
         });
 
         let slack_client2 = slack_client.to_owned();
@@ -87,9 +97,8 @@ impl SMTPServer {
             }
         });
 
-        while tokio::signal::ctrl_c().await.is_ok() {
-            info!("SMTP server is shutdown...");
-            std::process::exit(0);
+        if let Err(e) = ps_rx.await? {
+            return Err(anyhow!(e));
         }
 
         Ok(())

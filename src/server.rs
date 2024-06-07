@@ -2,7 +2,7 @@ mod smtp;
 
 use crate::client::SlackClient;
 use crate::env::Config;
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Error, Result};
 use smtp::*;
 use thiserror::Error as ThisError;
 use tracing::{error, info};
@@ -15,6 +15,8 @@ enum ServerError {
     InvalidConfig,
     #[error("Cannot start server, Please check port number is not in use")]
     CannotStartServer,
+    #[error("Something went wrong")]
+    UnknownError,
 }
 
 pub async fn run() -> Result<(), Error> {
@@ -42,6 +44,24 @@ pub async fn run() -> Result<(), Error> {
 
     info!("starting noticube server");
 
-    SMTPServer::run(&config.get_address(), &slack_client).await?;
-    Ok(())
+    let server_address = config.get_address();
+    tokio::select! {
+        ctrl_c_result = tokio::signal::ctrl_c() => {
+            if ctrl_c_result.is_ok() {
+                info!("ctrl-c was inputted. shutdown server...");
+                Ok(())
+            } else {
+                info!("ctrl-c was inputted, but something error occurred.");
+                Err(anyhow!(ServerError::UnknownError))
+            }
+
+        }
+        server_status = SMTPServer::run(&server_address, &slack_client) => {
+            if let Err(e) = server_status {
+                Err(e)
+            } else {
+                Ok(())
+            }
+        }
+    }
 }
