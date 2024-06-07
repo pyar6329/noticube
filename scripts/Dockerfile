@@ -35,8 +35,7 @@ RUN set -x && \
   cargo-chef chef prepare --recipe-path recipe.json
 
 # library caching
-RUN --mount=type=secret,id=git-credentials,target=/root/.git-credentials \
-  set -x && \
+RUN set -x && \
   rm -rf Cargo.toml Cargo.lock src && \
   cargo-chef chef cook --release --recipe-path recipe.json
 
