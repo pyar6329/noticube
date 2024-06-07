@@ -8,7 +8,8 @@ download command
 
 ```bash
 $ curl -o noticube https://github.com/pyar6329/noticube/releases/download/0.1.0/noticube-Linux-x86_64
-$ mv noticube /usr/local/bin/noticube
+$ sudo mv noticube /usr/local/bin/noticube
+$ sudo chmod +x /usr/local/bin/noticube
 ```
 
 and run it!
