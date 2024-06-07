@@ -51,7 +51,6 @@ spec:
       containers:
       - name: noticube
         image: "ghcr.io/pyar6329/noticube:0.1.0"
-        command: ["/usr/local/bin/noticube"]
         ports:
         - containerPort: 2525
         # resources:
