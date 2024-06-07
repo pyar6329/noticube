@@ -16,9 +16,20 @@ if ! type swaks > /dev/null 2>&1; then
   fi
 fi
 
+CONTENT=$(cat << EOF
+hello world!!!!
+foobar hoge
+あいうえお
+漢字
+カタカナ
+😁
+sorry
+EOF
+)
+
 swaks \
   --server "localhost" \
   --port "${NOTICUBE_IP:-2525}" \
   --from "sender@example.com" \
   --to "receiver@example.com" \
-  --body "hello world!!!!"
+  --body "${CONTENT}"
