@@ -1,0 +1,77 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: noticube
+  namespace: default
+  labels:
+    app: noticube
+spec:
+  ports:
+  - name: tcp
+    protocol: TCP
+    port: 2525
+    targetPort: 2525
+  selector:
+    app: noticube
+  # type: LoadBalancer
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: noticube
+type: Opaque
+stringData:
+  NOTICUBE_PORT: "2525"
+  NOTICUBE_IP: "0.0.0.0"
+  SLACK_BOT_TOKEN: "your slack bot token"
+  SLACK_CHANNEL_ID: "your slack channel id"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: noticube
+  labels:
+    app: noticube
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: noticube
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 25%
+  template:
+    metadata:
+      labels:
+        app: noticube
+    spec:
+      containers:
+      - name: noticube
+        image: "ghcr.io/pyar6329/noticube:0.1.0"
+        command: ["/usr/local/bin/noticube"]
+        ports:
+        - containerPort: 2525
+        # resources:
+        #   requests:
+        #     cpu: "100m"
+        #     memory: "256Mi"
+        #   limits:
+        #     cpu: "250m"
+        #     memory: "512Mi"
+        envFrom:
+        - secretRef:
+            name: noticube
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  namespace: default
+  name: noticube
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: noticube
