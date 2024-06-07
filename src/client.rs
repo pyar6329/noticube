@@ -170,6 +170,7 @@ impl Client {
 
 impl From<StatusCode> for ClientError {
     fn from(status: StatusCode) -> Self {
+        error!("reqwest returns error http status code: {}", &status);
         match status {
             StatusCode::NOT_FOUND => NotFound,               // 404
             StatusCode::CONFLICT => Conflict,                // 409
@@ -185,6 +186,7 @@ impl From<StatusCode> for ClientError {
 
 impl From<ReqwestError> for ClientError {
     fn from(err: ReqwestError) -> Self {
+        error!("reqwest error: {}", &err);
         if err.is_timeout() {
             return Timeout;
         }
@@ -206,7 +208,8 @@ impl From<ReqwestMiddlewareError> for ClientError {
         if let ReqwestMiddlewareError::Reqwest(e) = err {
             return Self::from(e);
         }
-        if let ReqwestMiddlewareError::Middleware(_) = err {
+        if let ReqwestMiddlewareError::Middleware(e) = err {
+            error!("reqwest middleware error: {}", e);
             return ReqwestMiddlewareError;
         }
         UnknownError
