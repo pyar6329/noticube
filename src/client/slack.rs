@@ -4,14 +4,11 @@ use std::ops::Deref;
 #[derive(Debug, Clone)]
 pub struct SlackClient {
     client: Client,
-    bot_token: String,
     channel_id: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct SendRequestBody {
-    #[serde(rename = "token")]
-    bot_token: String,
     #[serde(rename = "channel")]
     channel_id: String,
     #[serde(rename = "text")]
@@ -19,19 +16,23 @@ struct SendRequestBody {
 }
 
 #[derive(Deserialize)]
-struct SendResponseBody;
+struct SendResponseBody {
+    #[serde(rename = "ok")]
+    #[allow(dead_code)]
+    is_succeed: bool,
+}
 
 impl SlackClient {
-    pub fn new(token: &str, channel_id: &str) -> Result<Self, Error> {
+    pub fn new(bot_token: &str, channel_id: &str) -> Result<Self, Error> {
         const TIMEOUT_NUM: u8 = 10;
         const RETRY_NUM: u8 = 3;
         let base_url = Url::parse("https://slack.com/api").unwrap();
+        let base_header = BaseHeader::new(bot_token);
 
-        let client = Client::new(base_url, &TIMEOUT_NUM, &RETRY_NUM)?;
+        let client = Client::new(base_url, base_header, &TIMEOUT_NUM, &RETRY_NUM)?;
 
         let slack_client = Self {
             client,
-            bot_token: token.to_string(),
             channel_id: channel_id.to_string(),
         };
 
@@ -41,12 +42,13 @@ impl SlackClient {
     pub async fn send(&self, content: &str) -> Result<(), Error> {
         let request_body = SendRequestBody {
             content: content.to_string(),
-            bot_token: self.bot_token.to_owned(),
             channel_id: self.channel_id.to_owned(),
         };
 
+        debug!("sending message to slack: {:?}", request_body);
+
         let client = self.deref();
-        let _ = client
+        let _: SendResponseBody = client
             .execute(HTTPMethod::POST, "/chat.postMessage", &request_body)
             .await?;
 

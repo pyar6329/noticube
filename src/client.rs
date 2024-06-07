@@ -1,7 +1,10 @@
 mod slack;
 
 use anyhow::{anyhow, Error, Result};
-use reqwest::{Client as ReqwestClient, Error as ReqwestError, Method as HTTPMethod, StatusCode};
+use reqwest::{
+    header, header::AUTHORIZATION, Client as ReqwestClient, Error as ReqwestError,
+    Method as HTTPMethod, StatusCode,
+};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware, Error as ReqwestMiddlewareError};
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use reqwest_tracing::TracingMiddleware;
@@ -11,6 +14,7 @@ use std::path::Path;
 use strum::EnumIs;
 use thiserror::Error as ThisError;
 use tokio::time::Duration;
+use tracing::{debug, error};
 use url::Url;
 use ClientError::*;
 
@@ -42,14 +46,52 @@ pub enum ClientError {
 }
 
 #[derive(Debug, Clone)]
+pub enum AuthorizationHeader {
+    Bearer(String),
+}
+
+#[derive(Debug, Clone)]
+pub struct BaseHeader {
+    pub authorization: AuthorizationHeader,
+}
+
+impl BaseHeader {
+    pub fn new(token: &str) -> Self {
+        Self {
+            authorization: AuthorizationHeader::Bearer(token.to_string()),
+        }
+    }
+
+    pub fn to_header(&self) -> header::HeaderMap {
+        use AuthorizationHeader::*;
+        let mut headers = header::HeaderMap::new();
+        match &self.authorization {
+            Bearer(token) => {
+                let authorization_value =
+                    header::HeaderValue::from_str(&format!("Bearer {}", token))
+                        .unwrap_or(header::HeaderValue::from_str("").unwrap());
+                headers.insert(AUTHORIZATION, authorization_value);
+            }
+        }
+        headers
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Client {
     client: ClientWithMiddleware,
     base_url: Url,
 }
 
 impl Client {
-    pub(super) fn new(base_url: Url, timeout: &u8, retry: &u8) -> Result<Self, Error> {
+    pub(super) fn new(
+        base_url: Url,
+        base_header: BaseHeader,
+        timeout: &u8,
+        retry: &u8,
+    ) -> Result<Self, Error> {
         let reqwest_client = ReqwestClient::builder()
+            .default_headers(base_header.to_header())
             .timeout(Duration::from_secs(*timeout as u64))
             .build()
             .map_err(|_| InitializeError)?;
@@ -94,15 +136,22 @@ impl Client {
             url_segment.pop_if_empty().extend(endpoint_strs);
         }
 
+        debug!("requesting to {}", &url);
+        debug!("client is {:?}", &self.client);
+
         let response = self
             .client
             .request(method, url)
             .json(&body)
             .send()
             .await
-            .map_err(ClientError::from)?;
+            .map_err(|e| {
+                error!("reqwest execute error: {:?}", e);
+                ClientError::from(e)
+            })?;
 
         let status = response.status();
+        debug!("status is {:?}", &status);
 
         if status.is_client_error() || status.is_server_error() {
             return Err(anyhow!(ClientError::from(status)));
@@ -111,7 +160,10 @@ impl Client {
         response
             .json::<U>()
             .await
-            .map_err(ClientError::from)
+            .map_err(|e| {
+                error!("response json parsing error: {:?}", e);
+                ClientError::from(e)
+            })
             .map_err(Error::new)
     }
 }

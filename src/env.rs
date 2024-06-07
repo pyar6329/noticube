@@ -5,12 +5,18 @@ use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
+    #[serde(default = "default_debug_mode")]
+    pub debug_mode: bool, // export DEBUG_MODE="true"
     #[serde(default = "default_port")]
     pub noticube_port: u16, // export NOTICUBE_PORT="2525"
     #[serde(default = "default_allow_ip")]
     pub noticube_ip: String, // export NOTICUBE_IP="0.0.0.0"
     pub slack_bot_token: String,  // export SLACK_BOT_TOKEN="xxxxxx"
     pub slack_channel_id: String, // export SLACK_CHANNEL_ID="yyyyyy"
+}
+
+fn default_debug_mode() -> bool {
+    false
 }
 
 fn default_port() -> u16 {

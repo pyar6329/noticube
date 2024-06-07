@@ -1,35 +1,60 @@
 use super::ServerError;
-// use crate::client::SlackClient;
+use crate::client::SlackClient;
 use anyhow::{Error, Result};
 use mailin_embedded::{response, Handler, Response, Server};
+use std::sync::{Arc, Mutex};
 use std::{io, net::IpAddr};
-use tracing::{error, info};
+use tokio::sync::mpsc;
+use tracing::{debug, error, info};
 
-#[derive(Clone)]
-pub(super) struct SMTPServer;
+#[derive(Debug, Clone)]
+pub(super) struct SMTPServer {
+    email_content_buffer: Arc<Mutex<String>>,
+    tx: mpsc::Sender<String>,
+}
 
 impl Handler for SMTPServer {
-    fn mail(&mut self, _ip: IpAddr, _domain: &str, _from: &str) -> Response {
-        info!("yearrrrrrrrrrrrrrrrrr!!!!!!!: ");
+    fn mail(&mut self, _ip: IpAddr, _domain: &str, from: &str) -> Response {
+        debug!("received email. from: {}", from);
         response::OK
     }
 
     fn data(&mut self, buf: &[u8]) -> io::Result<()> {
-        let maybe_str = std::str::from_utf8(buf);
-        if let Ok(s) = maybe_str {
-            info!("content: {}", s);
-        } else {
-            info!("errrrrrrrrrrrrrrrrr");
+        let maybe_line = std::str::from_utf8(buf);
+        if let Ok(line) = maybe_line {
+            let maybe_buffer = self.email_content_buffer.lock();
+            if let Ok(mut buffer) = maybe_buffer {
+                buffer.push_str(line);
+            }
         }
-        // client = SlackClient::new(&config.slack_bot_token, &config.slack_channel_id)?;
         Ok(())
+    }
+
+    fn data_end(&mut self) -> Response {
+        let maybe_buffer = self.email_content_buffer.lock();
+        if let Ok(buffer) = maybe_buffer {
+            debug!("result: {}", buffer);
+            let tx2 = self.tx.to_owned();
+            let buffer2 = buffer.to_owned();
+
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .spawn(async move { tx2.send(buffer2).await });
+        }
+        response::OK
     }
 }
 
 impl SMTPServer {
-    pub fn run(address: &str) -> Result<(), Error> {
+    pub async fn run(address: &str, slack_client: &SlackClient) -> Result<(), Error> {
         info!("succeed loading configuration");
-        let handler = SMTPServer {};
+        let (tx, mut rx) = mpsc::channel(32);
+        let handler = SMTPServer {
+            email_content_buffer: Arc::new(Mutex::new("".to_string())),
+            tx,
+        };
         let mut server = Server::new(handler);
 
         info!("checking SMTP server configuration");
@@ -42,10 +67,30 @@ impl SMTPServer {
             })?;
         info!("succeed SMTP server configuration");
         info!("running SMTP server");
-        let _ = server.serve().map_err(|e| {
-            error!("error running SMTP server: {}", e);
-            ServerError::CannotStartServer
-        })?;
+        tokio::spawn(async move {
+            let _ = server.serve().map_err(|e| {
+                error!("error running SMTP server: {}", e);
+                ServerError::CannotStartServer
+            });
+        });
+
+        let slack_client2 = slack_client.to_owned();
+        tokio::spawn(async move {
+            while let Some(content) = rx.recv().await {
+                debug!("received content: {}", &content);
+                let result = slack_client2.send(&content).await;
+                if let Err(e) = result {
+                    error!("failed sending content to Slack: {}", e);
+                } else {
+                    info!("succeed sending content to Slack");
+                }
+            }
+        });
+
+        while tokio::signal::ctrl_c().await.is_ok() {
+            info!("SMTP server is shutdown...");
+            std::process::exit(0);
+        }
 
         Ok(())
     }

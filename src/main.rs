@@ -1,6 +1,7 @@
 use anyhow::{Error, Result};
 use noticube::server;
 
-fn main() -> Result<(), Error> {
-    server::run()
+#[tokio::main]
+async fn main() -> Result<(), Error> {
+    server::run().await
 }
