@@ -34,14 +34,6 @@ send_mail: ## check sending email
 	@./scripts/check_sending_mail.sh
 
 .PHONY:	test
-test: ## run: unit/integration test
-	@cargo test
-
-.PHONY: test_debug
-test_debug: ## run: unit/integration test (print debug mode)
-	@cargo test -- --nocapture
-
-.PHONY:	test
 test_unit: ## run: only unit test
 	@cargo test --lib
 
