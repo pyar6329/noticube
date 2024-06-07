@@ -18,12 +18,10 @@ fi
 
 CONTENT=$(cat << EOF
 hello world!!!!
-foobar hoge
 あいうえお
 漢字
 カタカナ
 😁
-sorry
 EOF
 )
 
