@@ -26,8 +26,8 @@ EOF
 )
 
 swaks \
-  --server "localhost" \
-  --port "${NOTICUBE_IP:-2525}" \
+  --server "${NOTICUBE_DOMAIN:-localhost}" \
+  --port "${NOTICUBE_PORT:-2525}" \
   --from "sender@example.com" \
   --to "receiver@example.com" \
   --body "${CONTENT}"
