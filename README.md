@@ -30,7 +30,7 @@ $ docker run \
     -e NOTICUBE_IP="0.0.0.0" \
     -e SLACK_BOT_TOKEN="xxxxxx" \
     -e SLACK_CHANNEL_ID="yyyyyy" \
-    ghcr.io/pyar6329/noticube:0.1.0
+    ghcr.io/pyar6329/noticube:0.1.1
 ```
 
 ## Kubernetes
