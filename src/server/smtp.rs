@@ -35,7 +35,7 @@ impl Handler for SMTPServer {
 
     fn data_end(&mut self) -> Response {
         let maybe_buffer = self.email_content_buffer.lock();
-        if let Ok(buffer) = maybe_buffer {
+        if let Ok(mut buffer) = maybe_buffer {
             debug!("result: {}", buffer);
             let tx2 = self.tx.to_owned();
             let buffer2 = buffer.to_owned();
@@ -46,6 +46,7 @@ impl Handler for SMTPServer {
                 .unwrap();
 
             rt.spawn(async move { tx2.send(buffer2).await });
+            buffer.clear(); // reset all data
             rt.shutdown_timeout(Duration::from_secs(30));
         }
         response::OK
