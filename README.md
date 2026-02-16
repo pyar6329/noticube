@@ -7,9 +7,8 @@ SMTP Server which is notified to Slack rather than sending Email
 download command
 
 ```bash
-$ curl -o noticube https://github.com/pyar6329/noticube/releases/download/0.1.0/noticube-Linux-x86_64
-$ sudo mv noticube /usr/local/bin/noticube
-$ sudo chmod +x /usr/local/bin/noticube
+$ sudo curl -L -o /usr/local/sbin/noticube https://github.com/pyar6329/noticube/releases/download/0.1.1/noticube-Linux-x86_64
+$ sudo chmod +x /usr/local/sbin/noticube
 ```
 
 and run it!
@@ -41,4 +40,19 @@ Please change environment variables in [`kubernetes/deployment.yaml`](https://gi
 $ git clone git@github.com:pyar6329/noticube.git
 $ cd noticube
 $ kubectl apply -f kubernetes/deployment.yaml
+```
+
+## systemd
+
+```bash
+$ sudo curl -L -o /etc/systemd/system/noticube.service https://raw.githubusercontent.com/pyar6329/noticube/refs/heads/main/systemd/system/noticube.service
+$ sudo curl -L -o /etc/default/noticube-credentials https://raw.githubusercontent.com/pyar6329/noticube/refs/heads/main/systemd/etc/noticube-credentials
+$ sudo chmod 600 /etc/default/noticube-credentials
+
+# Please change SLACK_BOT_TOKEN, SLACK_CHANNEL_ID
+$ sudo vim /etc/default/noticube-credentials
+
+$ sudo systemctl daemon-reload
+$ sudo systemctl enable --now noticube
+$ sudo systemctl status noticube
 ```
