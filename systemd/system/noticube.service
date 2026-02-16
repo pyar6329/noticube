@@ -1,0 +1,14 @@
+[Unit]
+Description=Noticube SMTP server for Slack notification
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/default/noticube-credentials
+ExecStart=/usr/local/sbin/noticube
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
